@@ -1,0 +1,103 @@
+遇到numpy报错
+Error: module 'numpy' has no attribute 'object'.
+`np.object` was a deprecated alias for the builtin `object`. To avoid this error in existing code, use `object` by itself. Doing this will not modify any behavior and is safe. 
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+/Users/albertfei/anaconda3/envs/pyplot/lib/python3.8/site-packages/diopy/output.py:244: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  if np.issubdtype(cate_dtype, np.object):
+
+尝试解决办法
+Try to use simple "monkey path". Add line like
+
+```csharp
+np.object = object    
+```
+
+or
+
+```csharp
+np.int = int    
+```
+
+in case _module 'numpy' has no attribute 'int'_
+
+```csharp
+np.float = float    
+```
+
+_module 'numpy' has no attribute 'int'_
+
+```csharp
+np.bool = bool    
+```
+
+and so on... (if problem with last Numpy versions)
+
+安装seurat v5问题
+1. 从github上下载
+```
+remotes::install_github("satijalab/seurat", "seurat5", quiet = TRUE)
+```
+	运行后始终报错
+```
+	Error: Failed to install 'Seurat' from GitHub:
+	 ! System command 'R' failed
+```
+解决办法：
+首先强制打开 quiet = FALSE，定位具体问题
+发现hdf5无法正确定位，导致BPcells无法正确安装
+进入seurat官方安装指导，发现Apple M1芯片电脑安装时会出现兼容性错误
+根据指导，首先安装
+```
+brew install hdf5 llvm
+```
+然后获取 LLVM 的安装路径:
+运行以下命令，并记下输出中的路径
+```
+brew info llvm
+```
+然后找到hdf5.h文件的位置
+```
+find /opt/homebrew/Cellar -name hdf5.h
+```
+然后创建文件
+```
+mkdir -p ~/.R #创建文件目录
+nano ~/.R/Makevars
+```
+在其中添加：（具体路径根据前几步骤找到的来填写）
+```
+CC=/opt/homebrew/Cellar/llvm/版本号/bin/clang
+CXX=/opt/homebrew/Cellar/llvm/版本号/bin/clang++
+CFLAGS=-I/opt/homebrew/Cellar/hdf5/版本号/include/
+CXXFLAGS=-I/opt/homebrew/Cellar/hdf5/版本号/include/
+```
+然后尝试安装：
+```
+remotes::install_github("bnprks/BPCells")
+```
+如果成功安装，再尝试安装：
+```
+remotes::install_github("satijalab/seurat", "seurat5", quiet = TRUE)
+```
+
+2. 运行示例代码时遇到的报错
+```
+top.features <- head(SpatiallyVariableFeatures(s1, selection.method = "moransi"), 6) 
+```
+始终报错：
+```
+Error in xtfrm.data.frame(x) : cannot xtfrm data frames
+```
+这似乎是一个遗留问题，但Seurat包的作者始终没有解决，一位好心、热心的代码大神解决了这个问题，详情见https://github.com/mojaveazure/seurat-object/issues/25
+
+用以下代码代替 top.features <- head(SpatiallyVariableFeatures(s1, selection.method = "moransi"), 6)
+```
+top.features = rownames(
+  dplyr::slice_min(
+    s1[["SCT"]]@meta.features,
+    moransi.spatially.variable.rank,
+    n = 6
+  )
+)
+```
